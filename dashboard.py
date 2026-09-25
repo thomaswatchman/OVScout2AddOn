@@ -4,344 +4,214 @@ import datavolley as dv
 from pathlib import Path
 
 
-# ============================================================
-# PAGE SETUP
-# ============================================================
-
 st.set_page_config(
-    page_title="Live Volleyball Passing",
+    page_title="Live Volleyball Analysis",
     layout="wide"
 )
 
-st.title("Live Volleyball Passing")
+st.title("Live Volleyball Analysis")
 
 DVW_FILE = Path("updates/myfile-live.dvw")
 
 
 # ============================================================
-# LIVE DASHBOARD
+# TEAM SELECTOR - ALWAYS RENDERED
 # ============================================================
 
-@st.fragment(run_every=5)
-def live_dashboard():
+team_choice = st.radio(
+    "Team",
+    ["Home", "Visiting"],
+    horizontal=True
+)
 
-    # --------------------------------------------------------
-    # LOAD LIVE DVW
-    # --------------------------------------------------------
+st.divider()
+
+
+# ============================================================
+# EMPTY TABLE
+# ============================================================
+
+def empty_table():
+    return pd.DataFrame({
+        "Player": pd.Series(dtype="Int64"),
+        "Attempts": pd.Series(dtype="int"),
+        "Pass %": pd.Series(dtype="float"),
+        "Errors": pd.Series(dtype="int")
+    })
+
+
+# ============================================================
+# LOAD LIVE DATA
+# ============================================================
+
+def load_stats():
 
     if not DVW_FILE.exists():
-        st.warning("Waiting for live match data...")
-        st.write(f"Looking for: {DVW_FILE.resolve()}")
-        return
+        return pd.DataFrame(), "Waiting for myfile-live.dvw"
 
     try:
         data = dv.read_dv(str(DVW_FILE))
         plays = pd.DataFrame(data)
-
     except Exception as e:
-        st.warning(f"Could not read live DVW file: {e}")
-        return
+        return pd.DataFrame(), f"Could not parse DVW: {e}"
 
     if plays.empty:
-        st.info("Waiting for plays...")
-        return
+        return pd.DataFrame(), "DVW loaded, but contains no plays"
 
-
-    # --------------------------------------------------------
-    # TEAM SELECTION
-    # --------------------------------------------------------
-
-    team_choice = st.radio(
-        "Team",
-        ["Home", "Visiting"],
-        horizontal=True
-    )
-
+    # The "team" column holds the actual team names from the file,
+    # so look up the selected team's name rather than hardcoding it
     if team_choice == "Home":
-        team_value = "Home"
+        team_name_column = "home_team"
         rotation_column = "home_setter_position"
     else:
-        team_value = "Visiting"
+        team_name_column = "visiting_team"
         rotation_column = "visiting_setter_position"
 
+    required = [
+        "skill",
+        "team",
+        "evaluation_code",
+        "player_number",
+        team_name_column,
+        rotation_column
+    ]
 
-    # --------------------------------------------------------
-    # GET RECEPTIONS
-    # --------------------------------------------------------
+    missing = [
+        column
+        for column in required
+        if column not in plays.columns
+    ]
+
+    if missing:
+        return pd.DataFrame(), f"Missing columns: {missing}"
+
+    team_value = plays[team_name_column].iloc[0]
+
+    # Setter positions are parsed as text ("5"), rotations below are numbers
+    plays[rotation_column] = pd.to_numeric(
+        plays[rotation_column],
+        errors="coerce"
+    ).astype("Int64")
+
+    plays["player_number"] = plays["player_number"].astype("Int64")
 
     receptions = plays[
         (plays["skill"] == "Reception") &
         (plays["team"] == team_value)
     ].copy()
 
-
     if receptions.empty:
-        st.info(f"No receptions recorded for {team_choice} yet.")
-        return
+        return pd.DataFrame(), "No receptions recorded yet"
 
-
-    # --------------------------------------------------------
-    # PASS CLASSIFICATION
-    #
-    # Good passes:
-    # #  &  +  !
-    #
-    # Reception error:
-    # =
-    # --------------------------------------------------------
-
-    GOOD_PASS_CODES = ["#", "&", "+", "!"]
-
+    # Good reception codes
     receptions["good_pass"] = (
         receptions["evaluation_code"]
-        .isin(GOOD_PASS_CODES)
+        .isin(["#", "&", "+", "!"])
     )
 
-    receptions["reception_error"] = (
+    # Reception errors
+    receptions["error"] = (
         receptions["evaluation_code"] == "="
     )
 
-
-    # --------------------------------------------------------
-    # CALCULATE PLAYER STATS BY ROTATION
-    # --------------------------------------------------------
-
-    passing_stats = (
+    stats = (
         receptions
         .groupby(
-            [
-                rotation_column,
-                "player_number"
-            ],
+            [rotation_column, "player_number"],
             dropna=False
         )
         .agg(
-            attempts=(
-                "evaluation_code",
-                "size"
-            ),
-            good_passes=(
-                "good_pass",
-                "sum"
-            ),
-            reception_errors=(
-                "reception_error",
-                "sum"
-            )
+            Attempts=("evaluation_code", "size"),
+            Good=("good_pass", "sum"),
+            Errors=("error", "sum")
         )
         .reset_index()
     )
 
-
-    # Passing percentage:
-    #
-    # (# + & + + + !) / total attempts
-    #
-    passing_stats["pass_percentage"] = (
-        passing_stats["good_passes"]
-        / passing_stats["attempts"]
-        * 100
+    stats["Pass %"] = (
+        stats["Good"] /
+        stats["Attempts"] *
+        100
     ).round(1)
 
+    stats = stats.rename(columns={
+        rotation_column: "Rotation",
+        "player_number": "Player"
+    })
 
-    # --------------------------------------------------------
-    # CLEAN PLAYER NUMBERS
-    # --------------------------------------------------------
-
-    passing_stats["player_number"] = (
-        pd.to_numeric(
-            passing_stats["player_number"],
-            errors="coerce"
-        )
-        .astype("Int64")
-    )
+    return stats, f"{len(receptions)} receptions loaded"
 
 
-    # ========================================================
-    # DISPLAY
-    # ========================================================
+# ============================================================
+# LIVE SECTION
+# ============================================================
 
-    st.divider()
+@st.fragment(run_every=5)
+def live_analysis():
 
-    st.subheader(f"{team_choice} Passing")
+    stats, status = load_stats()
 
+    st.caption(status)
 
-    # --------------------------------------------------------
-    # SIX ROTATIONS
-    # --------------------------------------------------------
+    st.subheader(f"{team_choice} Passing by Rotation")
 
-    rotation_order = [
+    rotation_layout = [
         [4, 3, 2],
         [5, 6, 1]
     ]
 
+    for row in rotation_layout:
 
-    for rotation_row in rotation_order:
+        cols = st.columns(3)
 
-        columns = st.columns(3)
+        for col, rotation in zip(cols, row):
 
-        for column, rotation in zip(columns, rotation_row):
-
-            with column:
+            with col:
 
                 st.markdown(f"### Rotation {rotation}")
 
-                rotation_stats = passing_stats[
-                    passing_stats[rotation_column] == rotation
-                ].copy()
-
-
-                if rotation_stats.empty:
-
-                    st.info("No receptions")
+                if stats.empty:
+                    display = empty_table()
 
                 else:
+                    display = stats[
+                        stats["Rotation"] == rotation
+                    ].copy()
 
-                    rotation_stats = (
-                        rotation_stats[
+                    if display.empty:
+                        display = empty_table()
+
+                    else:
+                        display = display[
                             [
-                                "player_number",
-                                "attempts",
-                                "pass_percentage",
-                                "reception_errors"
+                                "Player",
+                                "Attempts",
+                                "Pass %",
+                                "Errors"
                             ]
                         ]
-                        .rename(
-                            columns={
-                                "player_number": "Player",
-                                "attempts": "Attempts",
-                                "pass_percentage": "Pass %",
-                                "reception_errors": "Errors"
-                            }
-                        )
-                        .sort_values(
+
+                st.dataframe(
+                    display,
+                    hide_index=True,
+                    width="stretch",
+                    height=200,
+                    column_config={
+                        "Player": st.column_config.NumberColumn(
                             "Player"
+                        ),
+                        "Attempts": st.column_config.NumberColumn(
+                            "Attempts"
+                        ),
+                        "Pass %": st.column_config.NumberColumn(
+                            "Pass %",
+                            format="%.1f%%"
+                        ),
+                        "Errors": st.column_config.NumberColumn(
+                            "Errors"
                         )
-                    )
+                    }
+                )
 
 
-                    st.dataframe(
-                        rotation_stats,
-                        hide_index=True,
-                        width="stretch",
-                        column_config={
-                            "Player": st.column_config.NumberColumn(
-                                "Player",
-                                format="#%d"
-                            ),
-                            "Attempts": st.column_config.NumberColumn(
-                                "Attempts",
-                                format="%d"
-                            ),
-                            "Pass %": st.column_config.NumberColumn(
-                                "Pass %",
-                                format="%.1f%%"
-                            ),
-                            "Errors": st.column_config.NumberColumn(
-                                "Errors",
-                                format="%d"
-                            )
-                        }
-                    )
-
-
-    # ========================================================
-    # TOTAL PASSING
-    # ========================================================
-
-    st.divider()
-
-    st.subheader("Overall Passing")
-
-
-    overall = (
-        receptions
-        .groupby(
-            "player_number",
-            dropna=False
-        )
-        .agg(
-            attempts=(
-                "evaluation_code",
-                "size"
-            ),
-            good_passes=(
-                "good_pass",
-                "sum"
-            ),
-            reception_errors=(
-                "reception_error",
-                "sum"
-            )
-        )
-        .reset_index()
-    )
-
-
-    overall["pass_percentage"] = (
-        overall["good_passes"]
-        / overall["attempts"]
-        * 100
-    ).round(1)
-
-
-    overall["player_number"] = (
-        pd.to_numeric(
-            overall["player_number"],
-            errors="coerce"
-        )
-        .astype("Int64")
-    )
-
-
-    overall = (
-        overall[
-            [
-                "player_number",
-                "attempts",
-                "pass_percentage",
-                "reception_errors"
-            ]
-        ]
-        .rename(
-            columns={
-                "player_number": "Player",
-                "attempts": "Attempts",
-                "pass_percentage": "Pass %",
-                "reception_errors": "Errors"
-            }
-        )
-        .sort_values("Player")
-    )
-
-
-    st.dataframe(
-        overall,
-        hide_index=True,
-        width="stretch",
-        column_config={
-            "Player": st.column_config.NumberColumn(
-                "Player",
-                format="#%d"
-            ),
-            "Attempts": st.column_config.NumberColumn(
-                "Attempts",
-                format="%d"
-            ),
-            "Pass %": st.column_config.NumberColumn(
-                "Pass %",
-                format="%.1f%%"
-            ),
-            "Errors": st.column_config.NumberColumn(
-                "Errors",
-                format="%d"
-            )
-        }
-    )
-
-
-# ============================================================
-# START DASHBOARD
-# ============================================================
-
-live_dashboard()
+live_analysis()
