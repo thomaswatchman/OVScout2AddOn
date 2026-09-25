@@ -263,11 +263,18 @@ def distribution_chart(rotation_counts, zones):
             "Zone:N",
             sort=zones,
             title=None,
-            axis=alt.Axis(ticks=False, domain=False, labelPadding=6)
+            axis=alt.Axis(
+                ticks=False,
+                domain=False,
+                labelPadding=6,
+                labelFontSize=12,
+                labelLimit=0
+            )
         ),
         x=alt.X(
             "Share:Q",
-            scale=alt.Scale(domain=[0, 1.35]),
+            # Room past 100% for the value label
+            scale=alt.Scale(domain=[0, 1.5]),
             axis=None
         ),
         tooltip=[
@@ -283,15 +290,26 @@ def distribution_chart(rotation_counts, zones):
         cornerRadiusEnd=4
     )
 
+    # Text marks don't follow Streamlit's theme, so match it here
+    if st.context.theme.type == "dark":
+        text_color = "#fafafa"
+    else:
+        text_color = "#31333f"
+
     labels = base.mark_text(
         align="left",
-        dx=6
+        dx=6,
+        fontSize=12,
+        color=text_color
     ).encode(
         text="Label:N"
     )
 
+    # Fill the column, and keep axis labels and value labels inside it
     return (bars + labels).properties(
-        height=len(zones) * 28
+        width="container",
+        height=len(zones) * 28,
+        autosize=alt.AutoSizeParams(type="fit-x", contains="padding")
     ).configure_view(
         stroke=None
     )
