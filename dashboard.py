@@ -11,11 +11,11 @@ st.set_page_config(
 
 st.title("Live Volleyball Analysis")
 
-DVW_FILE = Path("updates/myfile-live.dvw")
+DVW_FILE = Path(__file__).resolve().parent / "updates" / "myfile-live.dvw"
 
 
 # ============================================================
-# TEAM SELECTOR - ALWAYS RENDERED
+# TEAM SELECTOR 
 # ============================================================
 
 team_choice = st.radio(

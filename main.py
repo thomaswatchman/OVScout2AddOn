@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 import subprocess
 import sys
 
-DVW_FILE = Path("/Users/thomaswatchman/VolleyballDWVAnalysis/updates/myfile-live.dvw")
+PROJECT_DIR = Path(__file__).resolve().parent
+DVW_FILE = PROJECT_DIR / "updates" / "myfile-live.dvw"
 
 last_modified = None
 
@@ -49,10 +50,10 @@ while True:
 
                 dashboard_process = subprocess.Popen([
                     sys.executable,
-                    "-m"
+                    "-m",
                     "streamlit",
                     "run",
-                    "dashboard.py"
+                    str(PROJECT_DIR / "dashboard.py")
                 ])
 
 

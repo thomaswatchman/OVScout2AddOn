@@ -84,13 +84,13 @@ Copy and paste this line into the terminal and press Enter:
 **Mac:**
 
 ```
-pip3 install pydatavolley pandas streamlit matplotlib
+pip3 install openvolley-pydatavolley pandas streamlit matplotlib
 ```
 
 **Windows:**
 
 ```
-pip install pydatavolley pandas streamlit matplotlib
+pip install openvolley-pydatavolley pandas streamlit matplotlib
 ```
 
 Wait for it to finish. You only need to do this once.
@@ -119,24 +119,18 @@ ov_scouter(
 
 ### 2. Start the dashboard
 
-1. Open a terminal and go into the project folder (setup steps 3 and 6).
-2. Run the program:
+**Mac:** open the `OVScout2AddOn` folder on your Desktop and double-click **Start Dashboard.command**. It gets the latest version and opens the dashboard for you.
 
-   **Mac:**
+**Windows:** open a terminal, go into the project folder (setup steps 3 and 6), then run:
 
-   ```
-   python3 main.py
-   ```
+```
+git pull
+python main.py
+```
 
-   **Windows:**
+The dashboard opens in your web browser. It refreshes automatically every few seconds as you scout.
 
-   ```
-   python main.py
-   ```
-
-3. The dashboard opens in your web browser. It refreshes automatically every few seconds as you scout.
-
-**To stop the program:** click the terminal window and press `Ctrl + C`.
+**To stop the program:** click the Terminal window and press `Ctrl + C`.
 
 ---
 
@@ -159,13 +153,9 @@ ov_scouter(
 
 ## Getting the latest version
 
-Open a terminal, go into the project folder (setup step 6) and run:
+**Mac:** nothing to do. **Start Dashboard.command** does this automatically every time.
 
-```
-git pull
-```
-
-That downloads the newest changes. Do this before each match.
+**Windows:** run `git pull` in the project folder before each match (it's included in the steps above).
 
 > **Don't edit the project's files yourself.** If you only ever run `git pull`, it will always work.
 
