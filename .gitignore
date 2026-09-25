@@ -1,0 +1,3 @@
+# Live match files saved by ovscout2 (keep the folder, not its contents)
+updates/*
+!updates/.gitkeep
