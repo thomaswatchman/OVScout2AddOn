@@ -19,7 +19,7 @@ Go to [python.org/downloads](https://www.python.org/downloads/), click the yello
 3. Open RStudio, paste this into the **Console** (bottom-left panel) and press Enter:
 
    ```r
-   install.packages("ovscout2", repos = c("https://openvolley.r-universe.dev", "https://cloud.r-project.org"))
+   install.packages(c("ovscout2", "readxl"), repos = c("https://openvolley.r-universe.dev", "https://cloud.r-project.org"))
    ```
 
    Wait for it to finish. It can take a few minutes.
@@ -99,25 +99,33 @@ Wait for it to finish. You only need to do this once.
 
 ## Running it during a match
 
-### 1. Start scouting in R
+### 1. Fill in the rosters
 
-Open RStudio and paste this into the Console. It opens ovscout2 in autosave mode, so the match file is saved into the project's `updates` folder as you scout.
+Open **roster.xlsx** in the `OVScout2AddOn` folder (Excel or Numbers both work). It has two sheets, **Home** and **Visiting**:
+
+- Type the team name in the yellow cell at the top.
+- Add one player per row: **Number** (required), **First name**, **Last name** and **Role** (pick from the dropdown, or leave blank).
+- Save the file.
+
+> **First time only:** `roster.xlsx` doesn't exist yet. Run step 2 once and it will be created for you, then fill it in and run step 2 again.
+
+You only need to change the file when the teams or players change.
+
+### 2. Start scouting in R
+
+Open RStudio, paste this into the Console and press Enter:
 
 ```r
-library(ovscout2)
-
-ov_scouter(
-  video_file = FALSE,
-  scout_mode = "type",
-  auto_save_dir = "~/Desktop/OVScout2AddOn/updates"
-)
+source("~/Desktop/OVScout2AddOn/start_match.R")
 ```
 
-> **Windows:** replace the path with the full path, for example `"C:/Users/yourname/Desktop/OVScout2AddOn/updates"` (use forward slashes `/`).
->
-> If you put the project somewhere other than your Desktop, change the `auto_save_dir` path to match. To find the path on a Mac, right-click the `updates` folder, hold the **Option** key and choose **Copy "updates" as Pathname**.
+ovscout2 opens with both rosters already loaded, and autosaves the match into the project's `updates` folder as you scout. Enter the starting lineups (**Edit lineups**) and start scouting.
 
-### 2. Start the dashboard
+> **Windows:** use the full path, for example `source("C:/Users/yourname/Desktop/OVScout2AddOn/start_match.R")` (use forward slashes `/`).
+>
+> If you put the project somewhere other than your Desktop, change the path to match. To find it on a Mac, right-click `start_match.R`, hold the **Option** key and choose **Copy "start_match.R" as Pathname**.
+
+### 3. Start the dashboard
 
 **Mac:** open the `OVScout2AddOn` folder on your Desktop and double-click **Start Dashboard.command**. It gets the latest version and opens the dashboard for you.
 
@@ -157,7 +165,7 @@ The dashboard opens in your web browser. It refreshes automatically every few se
 
 **Windows:** run `git pull` in the project folder before each match (it's included in the steps above).
 
-> **Don't edit the project's files yourself.** If you only ever run `git pull`, it will always work.
+> **Don't edit the project's files yourself**, apart from `roster.xlsx`. As long as you only change that file, `git pull` will always work.
 
 ---
 
@@ -169,6 +177,10 @@ The dashboard opens in your web browser. It refreshes automatically every few se
 | `No module named ...` | The Python packages aren't installed. Run setup step 7 again. |
 | `git pull` says **"Your local changes would be overwritten"** | Run `git reset --hard` and then `git pull` again. This undoes any changes to the project files on your computer. |
 | `not a git repository` | You're not in the project folder. Run setup step 6 first. |
-| `there is no package called 'ovscout2'` in R | Run the install command in setup step 2 again. |
-| Dashboard says **"Waiting for live match data..."** | Check that `auto_save_dir` in R points to the project's `updates` folder, and that you've started scouting. |
+| `there is no package called 'ovscout2'` or `'readxl'` in R | Run the install command in setup step 2 again. |
+| R says **"Created roster.xlsx"** | That's expected the first time. Fill in `roster.xlsx`, save it, and run `start_match.R` again. |
+| R says **"The team name (cell B1) is empty"** | Type the team name in the yellow cell on that sheet and save. |
+| R says a shirt number **isn't a whole number** or is **used twice** | Fix the Number column on that sheet and save. |
+| R says `cannot open file` when running `start_match.R` | The path is wrong. Check where the `OVScout2AddOn` folder is (see the note under "Start scouting in R"). |
+| Dashboard says **"Waiting for myfile-live.dvw"** | Start ovscout2 with `start_match.R` (so it saves into the `updates` folder) and scout at least one rally. |
 | `File not found` keeps printing in the terminal | Make sure you ran the program from inside the project folder (setup step 6). |

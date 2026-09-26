@@ -1,3 +1,7 @@
 # Live match files saved by ovscout2 (keep the folder, not its contents)
 updates/*
 !updates/.gitkeep
+
+# Each person's own roster (created from roster_template.xlsx)
+roster.xlsx
+~$*.xlsx
