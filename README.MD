@@ -84,13 +84,13 @@ Copy and paste this line into the terminal and press Enter:
 **Mac:**
 
 ```
-pip3 install openvolley-pydatavolley pandas streamlit matplotlib
+pip3 install openvolley-pydatavolley pandas streamlit
 ```
 
 **Windows:**
 
 ```
-pip install openvolley-pydatavolley pandas streamlit matplotlib
+pip install openvolley-pydatavolley pandas streamlit
 ```
 
 Wait for it to finish. You only need to do this once.

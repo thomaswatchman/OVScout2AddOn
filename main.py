@@ -1,10 +1,7 @@
 import time
 from pathlib import Path
 import datavolley as dv
-import time
-from pathlib import Path
 import pandas as pd
-import matplotlib.pyplot as plt
 import subprocess
 import sys
 
@@ -14,8 +11,6 @@ DVW_FILE = PROJECT_DIR / "updates" / "myfile-live.dvw"
 last_modified = None
 
 print("Watching:", DVW_FILE.resolve())
-
-plt.ion()
 
 dashboard_process = None
 
@@ -55,46 +50,6 @@ while True:
                     "run",
                     str(PROJECT_DIR / "dashboard.py")
                 ])
-
-
-            # Keep only successful attacks
-            kills = plays[
-                (plays["skill"] == "Attack") &
-                (plays["evaluation_code"] == "#")
-            ]
-
-            # Count kills by player
-            kills_by_player = (
-                kills.groupby(["team", "player_number"])
-                .size()
-                .reset_index(name="kills")
-            )
-
-            print("\nKILLS BY PLAYER")
-            print(kills_by_player)
-
-            # Plot
-            if not kills_by_player.empty:
-                kills_by_player["label"] = (
-                    kills_by_player["team"].astype(str)
-                    + " #"
-                    + kills_by_player["player_number"].astype(int).astype(str)
-                )
-
-                plt.clf()
-
-                plt.bar(
-                    kills_by_player["label"],
-                    kills_by_player["kills"]
-                )
-
-                plt.title("Kills by Player")
-                plt.xlabel("Player")
-                plt.ylabel("Kills")
-                plt.xticks(rotation=45)
-                plt.tight_layout()
-
-                plt.pause(0.1)
 
             last_modified = modified
 
