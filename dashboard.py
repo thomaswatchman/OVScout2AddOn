@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 import altair as alt
@@ -44,6 +45,24 @@ ZONE_ORDER = [
 # Attacks that weren't set: setter dump, overpass, attack on 2nd contact
 NOT_SET_COMBOS = ["PP", "PR", "P2"]
 
+# Player role numbers in the file's player list (from roster.xlsx)
+ROLE_CODES = {
+    "2": "outside",
+    "3": "opposite",
+    "4": "middle"
+}
+
+FRONT_ROW = [2, 3, 4]
+
+# When no zone is typed: (role, in front row) -> usual attack zone
+INFERRED_ZONES = {
+    ("outside", True): 4,
+    ("outside", False): 8,
+    ("opposite", True): 2,
+    ("opposite", False): 9,
+    ("middle", True): 3
+}
+
 BAR_COLOR = "#2a78d6"
 
 
@@ -78,8 +97,9 @@ def empty_table():
 # ============================================================
 
 def load_plays():
-    """Returns the selected team's plays with a numeric "Rotation" column,
-    plus the attack combination -> start zone lookup from the file."""
+    """Returns the selected team's plays with numeric "Rotation" and
+    "Court position" columns and each player's "Role", plus the attack
+    combination -> start zone lookup from the file."""
 
     if not DVW_FILE.exists():
         return pd.DataFrame(), {}, "Waiting for myfile-live.dvw"
@@ -98,9 +118,13 @@ def load_plays():
     if team_choice == "Home":
         team_name_column = "home_team"
         rotation_column = "home_setter_position"
+        lineup_prefix = "home_p"
+        players_section = "3PLAYERS-H"
     else:
         team_name_column = "visiting_team"
         rotation_column = "visiting_setter_position"
+        lineup_prefix = "visiting_p"
+        players_section = "3PLAYERS-V"
 
     required = [
         "skill",
@@ -134,10 +158,25 @@ def load_plays():
 
     plays["player_number"] = plays["player_number"].astype("Int64")
 
+    # Where the player was in the rotation (1-6), from the lineup on each play
+    plays["Court position"] = pd.Series(pd.NA, index=plays.index, dtype="Int64")
+    for position in range(1, 7):
+        column = f"{lineup_prefix}{position}"
+        if column not in plays.columns:
+            continue
+        in_position = (
+            pd.to_numeric(plays[column], errors="coerce").astype("Int64")
+            == plays["player_number"]
+        ).fillna(False).astype(bool)
+        plays.loc[in_position, "Court position"] = position
+
+    raw = DVW_FILE.read_text(encoding="utf-8", errors="replace")
+
+    roles = player_roles(raw, players_section)
+    plays["Role"] = plays["player_number"].map(roles)
+
     try:
-        combos = dv.extract_attack_combinations(
-            DVW_FILE.read_text(encoding="utf-8", errors="replace")
-        )
+        combos = dv.extract_attack_combinations(raw)
         combo_zones = {
             combo["code"]: combo["zone"]
             for combo in combos
@@ -146,6 +185,23 @@ def load_plays():
         combo_zones = {}
 
     return plays, combo_zones, None
+
+
+def player_roles(raw, section):
+    """Shirt number -> role ("outside", "opposite", "middle") from the
+    file's player list. Other roles are left out."""
+
+    match = re.search(rf"\[{section}\]\n(.*?)(?=\n\[3|$)", raw, re.DOTALL)
+    if not match:
+        return {}
+
+    roles = {}
+    for line in match.group(1).splitlines():
+        parts = line.split(";")
+        if len(parts) > 13 and parts[1].strip().isdigit() and parts[13] in ROLE_CODES:
+            roles[int(parts[1])] = ROLE_CODES[parts[13]]
+
+    return roles
 
 
 def passing_stats(plays):
@@ -211,20 +267,41 @@ def set_distribution(plays, combo_zones):
     if attacks.empty:
         return pd.DataFrame(), "No attacks recorded yet"
 
-    # Use the typed start zone, or fall back to the attack combination's zone
-    zone = pd.to_numeric(attacks["start_zone"], errors="coerce")
-    combo_zone = attacks["attack_code"].map(combo_zones)
-    attacks["Zone"] = zone.fillna(combo_zone).map(ZONE_NAMES)
+    # Use the typed start zone, then the attack combination's zone, then
+    # guess from the player's role and whether they were in the front row
+    typed_zone = pd.to_numeric(attacks["start_zone"], errors="coerce")
+    combo_zone = pd.to_numeric(
+        attacks["attack_code"].map(combo_zones),
+        errors="coerce"
+    )
+    inferred_zone = pd.Series(
+        [
+            INFERRED_ZONES.get((role, position in FRONT_ROW))
+            if pd.notna(position) else None
+            for role, position in zip(attacks["Role"], attacks["Court position"])
+        ],
+        index=attacks.index,
+        dtype="float"
+    )
+
+    known_zone = typed_zone.fillna(combo_zone)
+    attacks["Zone"] = known_zone.fillna(inferred_zone).map(ZONE_NAMES)
+    inferred = known_zone.isna() & attacks["Zone"].notna()
 
     with_zone = attacks.dropna(subset=["Zone", "Rotation"])
-    no_zone = len(attacks) - len(with_zone)
+    no_zone = attacks["Zone"].isna().sum()
+    no_rotation = len(attacks) - len(with_zone) - no_zone
 
-    status = f"{len(with_zone)} attacks with a zone"
+    status = f"{len(with_zone)} attacks"
+    if inferred.any():
+        status += f", {inferred.sum()} with the zone guessed from the player's role"
     if no_zone:
         status += (
-            f" ({no_zone} without a zone not shown - add the zone or an "
-            "attack combination when scouting, e.g. *04AH#V5)"
+            f". {no_zone} not shown: no zone typed and the player's role is "
+            "not outside, opposite or middle in roster.xlsx"
         )
+    if no_rotation:
+        status += f". {no_rotation} not shown: no setter position (rotation)"
 
     if with_zone.empty:
         return pd.DataFrame(), status
