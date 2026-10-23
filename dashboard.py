@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import datavolley as dv
+import streamlit.components.v1 as components
+from datetime import datetime
 from pathlib import Path
 
 
@@ -14,6 +16,10 @@ st.set_page_config(
 st.title("Live Volleyball Analysis")
 
 DVW_FILE = Path(__file__).resolve().parent / "updates" / "myfile-live.dvw"
+
+# Made by match_report.R, which main.py runs whenever the match file changes
+REPORT_FILE = DVW_FILE.parent / "match-report.html"
+REPORT_ERROR_FILE = DVW_FILE.parent / "match-report.html.error"
 
 ROTATION_LAYOUT = [
     [4, 3, 2],
@@ -508,4 +514,48 @@ def live_analysis():
                 )
 
 
-live_analysis()
+# ============================================================
+# MATCH REPORT
+# ============================================================
+
+@st.cache_data(max_entries=1)
+def read_report(modified):
+    """The report's HTML. Only re-read when the file's modified time changes."""
+    return REPORT_FILE.read_text(encoding="utf-8")
+
+
+@st.fragment(run_every=5)
+def match_report():
+
+    error = None
+    if REPORT_ERROR_FILE.exists():
+        error = REPORT_ERROR_FILE.read_text(encoding="utf-8").strip()
+
+    if not REPORT_FILE.exists():
+        st.caption(
+            error or
+            "The report appears here a few seconds after the first rally is scouted"
+        )
+        return
+
+    modified = REPORT_FILE.stat().st_mtime
+    status = f"Updated at {datetime.fromtimestamp(modified):%H:%M:%S}"
+    if error:
+        status += f". Couldn't update with the latest rallies: {error}"
+    st.caption(status)
+
+    # In its own frame so the report's styles don't change the dashboard.
+    # st.iframe is newer, so older Streamlit installs use components.html
+    if hasattr(st, "iframe"):
+        st.iframe(read_report(modified), height="content")
+    else:
+        components.html(read_report(modified), height=1500, scrolling=True)
+
+
+stats_tab, report_tab = st.tabs(["Live stats", "Match report"])
+
+with stats_tab:
+    live_analysis()
+
+with report_tab:
+    match_report()

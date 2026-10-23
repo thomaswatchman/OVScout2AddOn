@@ -138,6 +138,11 @@ python main.py
 
 The dashboard opens in your web browser. It refreshes automatically every few seconds as you scout.
 
+It has two tabs:
+
+- **Live stats**: passing and set distribution by rotation for the team you pick.
+- **Match report**: the classic DataVolley-style match report for both teams (the same one ovscout2 makes). It's rebuilt a few seconds after each rally.
+
 **To stop the program:** click the Terminal window and press `Ctrl + C`.
 
 ---
@@ -183,4 +188,6 @@ The dashboard opens in your web browser. It refreshes automatically every few se
 | R says a shirt number **isn't a whole number** or is **used twice** | Fix the Number column on that sheet and save. |
 | R says `cannot open file` when running `start_match.R` | The path is wrong. Check where the `OVScout2AddOn` folder is (see the note under "Start scouting in R"). |
 | Dashboard says **"Waiting for myfile-live.dvw"** | Start ovscout2 with `start_match.R` (so it saves into the `updates` folder) and scout at least one rally. |
+| Match report says **"Enter the starting lineups"** | Enter both teams' starting lineups in ovscout2 (**Edit lineups**). The report appears after the next rally. |
+| Match report says **"Could not find R"** or **"Could not find pandoc"** | Install R and RStudio (setup step 2). |
 | `File not found` keeps printing in the terminal | Make sure you ran the program from inside the project folder (setup step 6). |
